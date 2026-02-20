@@ -4,6 +4,7 @@ import CameraScreen from './screens/CameraScreen';
 import IdentifyScreen from './screens/IdentifyScreen';
 import WizardScreen from './screens/WizardScreen';
 import ResultScreen from './screens/ResultScreen';
+import SettingsScreen from './screens/SettingsScreen';
 
 function AppRouter() {
   const { screen } = useApp();
@@ -19,6 +20,8 @@ function AppRouter() {
       return <WizardScreen />;
     case 'result':
       return <ResultScreen />;
+    case 'settings':
+      return <SettingsScreen />;
     default:
       return <HomeScreen />;
   }

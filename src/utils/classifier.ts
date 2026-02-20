@@ -1,225 +1,117 @@
 import type { ItemCategory } from '../types';
 import { itemCategories } from '../data/categories';
 
-interface Prediction {
-  className: string;
-  probability: number;
-}
+const SYSTEM_PROMPT = `You are an airport security item classifier for Zurich Airport (ZRH).
+Given an image, identify the item and classify it into exactly ONE of these categories:
 
-interface MobileNetModel {
-  classify(img: HTMLImageElement, topk?: number): Promise<Prediction[]>;
-}
+1. batteries — Lithium batteries, power banks, rechargeable batteries, battery packs
+2. e-cigarettes — E-cigarettes, vapes, e-pipes, e-cigars, vape pens, IQOS
+3. electronics — Laptops, tablets, phones, cameras, headphones, electronic devices
+4. smart-luggage-removable — Smart suitcase with removable battery
+5. smart-luggage-permanent — Smart suitcase with non-removable battery
+6. luggage-trackers — AirTag, Tile, small GPS trackers
+7. electronic-bag-tags — Electronic bag tags (EBTS)
+8. liquids — Liquids, gels, creams, sprays, pastes, aerosols, drinks, perfume, shampoo
+9. knives-scissors — Knives, scissors, blades, box cutters, multi-tools
+10. tools — Screwdrivers, wrenches, pliers, drills, saws
+11. lighters-matches — Lighters, matches, Zippos
+12. blunt-objects — Baseball bats, golf clubs, hammers, martial arts equipment, hockey sticks
+13. prohibited — Fireworks, sparklers, fuel paste, gas cartridges, acids, toxic/corrosive substances
 
-let model: MobileNetModel | null = null;
-let modelLoadPromise: Promise<boolean> | null = null;
+Respond ONLY with valid JSON. No other text.
+{"categoryId":"one-of-the-ids-above","confidence":0.95,"itemName":"Short name of detected item"}
 
-// Maps MobileNet ImageNet labels (lowercased) to our category IDs.
-// MobileNet returns comma-separated alternative names per class.
-const keywordToCategory: Record<string, string> = {
-  // Electronics
-  'laptop': 'electronics',
-  'notebook': 'electronics',
-  'desktop computer': 'electronics',
-  'computer keyboard': 'electronics',
-  'space bar': 'electronics',
-  'mouse': 'electronics',
-  'cellular telephone': 'electronics',
-  'cell phone': 'electronics',
-  'cellphone': 'electronics',
-  'smartphone': 'electronics',
-  'dial telephone': 'electronics',
-  'ipod': 'electronics',
-  'digital watch': 'electronics',
-  'digital clock': 'electronics',
-  'monitor': 'electronics',
-  'screen': 'electronics',
-  'television': 'electronics',
-  'remote control': 'electronics',
-  'camera': 'electronics',
-  'reflex camera': 'electronics',
-  'polaroid camera': 'electronics',
-  'projector': 'electronics',
-  'loudspeaker': 'electronics',
-  'speaker': 'electronics',
-  'microphone': 'electronics',
-  'printer': 'electronics',
-  'hard disc': 'electronics',
-  'modem': 'electronics',
-  'joystick': 'electronics',
-  'cd player': 'electronics',
-  'tape player': 'electronics',
-  'cassette player': 'electronics',
-  'radio': 'electronics',
-  'headphone': 'electronics',
-  'earphone': 'electronics',
-  'hand-held computer': 'electronics',
-  'electric fan': 'electronics',
-  'hair dryer': 'electronics',
-  'vacuum': 'electronics',
-  'electric guitar': 'electronics',
-  'space heater': 'electronics',
-  'torch': 'electronics',
-  'flashlight': 'electronics',
+If you cannot classify the item or it does not fit any category, use:
+{"categoryId":"unknown","confidence":0,"itemName":"description of what you see"}`;
 
-  // Batteries & Power Banks
-  'power supply': 'batteries',
-  'battery': 'batteries',
-  'adapter': 'batteries',
-
-  // Liquids
-  'water bottle': 'liquids',
-  'pop bottle': 'liquids',
-  'soda bottle': 'liquids',
-  'wine bottle': 'liquids',
-  'beer bottle': 'liquids',
-  'beer glass': 'liquids',
-  'cocktail shaker': 'liquids',
-  'coffee mug': 'liquids',
-  'cup': 'liquids',
-  'pitcher': 'liquids',
-  'milk can': 'liquids',
-  'water jug': 'liquids',
-  'perfume': 'liquids',
-  'lotion': 'liquids',
-  'soap dispenser': 'liquids',
-  'hair spray': 'liquids',
-  'bottle': 'liquids',
-  'jug': 'liquids',
-  'pill bottle': 'liquids',
-  'medicine chest': 'liquids',
-  'goblet': 'liquids',
-  'red wine': 'liquids',
-  'eggnog': 'liquids',
-  'espresso': 'liquids',
-
-  // Knives & Scissors
-  'cleaver': 'knives-scissors',
-  'letter opener': 'knives-scissors',
-  'paper knife': 'knives-scissors',
-  'knife': 'knives-scissors',
-  'butcher knife': 'knives-scissors',
-  'scissors': 'knives-scissors',
-  'pocketknife': 'knives-scissors',
-  'jackknife': 'knives-scissors',
-  'swiss army knife': 'knives-scissors',
-  'dagger': 'knives-scissors',
-  'sword': 'knives-scissors',
-
-  // Tools
-  'screwdriver': 'tools',
-  'hammer': 'tools',
-  'hatchet': 'tools',
-  'power drill': 'tools',
-  'wrench': 'tools',
-  'plunger': 'tools',
-  'nail': 'tools',
-  'screw': 'tools',
-  'chain saw': 'tools',
-  'corkscrew': 'tools',
-  'crowbar': 'tools',
-  'shovel': 'tools',
-  'plane': 'tools',
-
-  // Lighters & Matches
-  'lighter': 'lighters-matches',
-  'matchstick': 'lighters-matches',
-  'match': 'lighters-matches',
-  'candle': 'lighters-matches',
-
-  // Blunt Objects
-  'baseball bat': 'blunt-objects',
-  'golf ball': 'blunt-objects',
-  'dumbbell': 'blunt-objects',
-  'barbell': 'blunt-objects',
-  'tennis racket': 'blunt-objects',
-  'racket': 'blunt-objects',
-  'cricket bat': 'blunt-objects',
-
-  // E-cigarettes
-  'cigarette': 'e-cigarettes',
-
-  // Prohibited
-  'firecracker': 'prohibited',
-  'projectile': 'prohibited',
-  'missile': 'prohibited',
-
-  // Smart Luggage
-  'suitcase': 'smart-luggage-removable',
-  'luggage': 'smart-luggage-removable',
-  'backpack': 'smart-luggage-removable',
-};
-
-export interface CategoryMatch {
-  category: ItemCategory;
+export interface DetectionResult {
+  category: ItemCategory | null;
+  categoryId: string;
   confidence: number;
-  detectedLabel: string;
+  itemName: string;
+  error?: string;
 }
 
-function mapPredictions(predictions: Prediction[]): CategoryMatch[] {
-  const matches: CategoryMatch[] = [];
-  const seen = new Set<string>();
-
-  for (const pred of predictions) {
-    const variants = pred.className.toLowerCase().split(/\s*,\s*/);
-
-    for (const variant of variants) {
-      const trimmed = variant.trim();
-
-      for (const [keyword, catId] of Object.entries(keywordToCategory)) {
-        if (seen.has(catId)) continue;
-        if (trimmed.includes(keyword) || keyword.includes(trimmed)) {
-          const cat = itemCategories.find((c) => c.id === catId);
-          if (cat) {
-            matches.push({
-              category: cat,
-              confidence: pred.probability,
-              detectedLabel: pred.className,
-            });
-            seen.add(catId);
-          }
-          break;
-        }
-      }
-    }
-  }
-
-  return matches.sort((a, b) => b.confidence - a.confidence);
-}
-
-export async function preloadModel(): Promise<boolean> {
-  if (model) return true;
-  if (modelLoadPromise) return modelLoadPromise;
-
-  modelLoadPromise = (async () => {
-    try {
-      const tf = await import('@tensorflow/tfjs');
-      await tf.ready();
-      const mobilenet = await import('@tensorflow-models/mobilenet');
-      model = await mobilenet.load({ version: 2, alpha: 0.5 }) as unknown as MobileNetModel;
-      return true;
-    } catch (err) {
-      console.error('AI model load failed:', err);
-      model = null;
-      return false;
-    }
-  })();
-
-  return modelLoadPromise;
-}
-
-export async function classifyImage(imgElement: HTMLImageElement): Promise<CategoryMatch[]> {
-  const ok = await preloadModel();
-  if (!ok || !model) return [];
-
+export async function classifyWithVision(
+  base64DataUrl: string,
+  apiKey: string
+): Promise<DetectionResult> {
   try {
-    const predictions = await model.classify(imgElement, 15);
-    return mapPredictions(predictions);
-  } catch (err) {
-    console.error('Classification error:', err);
-    return [];
-  }
-}
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: 'Identify this item for airport security purposes. What category does it belong to?',
+              },
+              {
+                type: 'image_url',
+                image_url: { url: base64DataUrl, detail: 'low' },
+              },
+            ],
+          },
+        ],
+        max_tokens: 150,
+        temperature: 0.1,
+      }),
+    });
 
-export function isModelReady(): boolean {
-  return model !== null;
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => null);
+      if (res.status === 401) {
+        return { category: null, categoryId: 'error', confidence: 0, itemName: '', error: 'Invalid API key. Please check your OpenAI API key in settings.' };
+      }
+      if (res.status === 429) {
+        return { category: null, categoryId: 'error', confidence: 0, itemName: '', error: 'Rate limit reached. Please wait a moment and try again.' };
+      }
+      return {
+        category: null,
+        categoryId: 'error',
+        confidence: 0,
+        itemName: '',
+        error: errBody?.error?.message || `API error (${res.status})`,
+      };
+    }
+
+    const data = await res.json();
+    const content: string = data.choices?.[0]?.message?.content || '';
+
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      return { category: null, categoryId: 'unknown', confidence: 0, itemName: content.slice(0, 60), error: 'Could not parse AI response.' };
+    }
+
+    const parsed = JSON.parse(jsonMatch[0]) as {
+      categoryId: string;
+      confidence: number;
+      itemName: string;
+    };
+
+    const cat = itemCategories.find((c) => c.id === parsed.categoryId) || null;
+
+    return {
+      category: cat,
+      categoryId: parsed.categoryId,
+      confidence: parsed.confidence,
+      itemName: parsed.itemName,
+    };
+  } catch (err) {
+    return {
+      category: null,
+      categoryId: 'error',
+      confidence: 0,
+      itemName: '',
+      error: err instanceof Error ? err.message : 'Network error. Check your connection.',
+    };
+  }
 }

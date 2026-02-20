@@ -1,4 +1,4 @@
-export type Screen = 'home' | 'camera' | 'identify' | 'wizard' | 'result';
+export type Screen = 'home' | 'camera' | 'identify' | 'wizard' | 'result' | 'settings';
 
 export type Verdict = 'allowed' | 'conditional' | 'not_allowed';
 

@@ -1,6 +1,5 @@
-import { useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import { preloadModel } from '../utils/classifier';
+import { hasApiKey } from '../utils/storage';
 import type { Verdict } from '../types';
 
 const dotColor: Record<Verdict, string> = {
@@ -16,10 +15,7 @@ function worst(a: Verdict, b: Verdict): Verdict {
 
 export default function HomeScreen() {
   const { goTo, resetSession, history, viewHistoryItem } = useApp();
-
-  useEffect(() => {
-    preloadModel();
-  }, []);
+  const keyConfigured = hasApiKey();
 
   const handleStart = () => {
     resetSession();
@@ -28,8 +24,22 @@ export default function HomeScreen() {
 
   return (
     <div className="min-h-full flex flex-col bg-gradient-to-b from-airport-blue via-airport-blue to-slate-900">
+      {/* Header row with settings */}
+      <div className="flex justify-end px-5 pt-12">
+        <button
+          onClick={() => goTo('settings')}
+          className="w-9 h-9 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center"
+          aria-label="Settings"
+        >
+          <svg className="w-[18px] h-[18px] text-white/80" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+        </button>
+      </div>
+
       {/* Hero */}
-      <div className="flex-shrink-0 px-6 pt-16 pb-10 text-center anim-fade-in">
+      <div className="flex-shrink-0 px-6 pt-2 pb-8 text-center anim-fade-in">
         <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-full px-4 py-1.5 mb-5">
           <span className="w-2 h-2 rounded-full bg-emerald-400" />
           <span className="text-[11px] font-semibold text-blue-200 uppercase tracking-widest">
@@ -44,17 +54,35 @@ export default function HomeScreen() {
         </p>
       </div>
 
+      {/* API key banner */}
+      {!keyConfigured && (
+        <div className="px-6 pb-4 anim-fade-in-up">
+          <button
+            onClick={() => goTo('settings')}
+            className="w-full bg-amber-500/20 backdrop-blur-sm border border-amber-400/30 text-left rounded-2xl px-5 py-4 flex items-center gap-4"
+          >
+            <span className="text-2xl">🔑</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-white">Set Up AI Detection</p>
+              <p className="text-xs text-amber-200/80 mt-0.5">
+                Add your OpenAI API key to enable automatic item identification
+              </p>
+            </div>
+            <svg className="w-5 h-5 text-amber-200/60 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        </div>
+      )}
+
       {/* Scan button */}
       <div className="px-6 pb-8 anim-fade-in-up">
         <button
           onClick={handleStart}
-          className="relative w-full group"
+          className="w-full bg-white text-airport-blue font-bold text-lg py-5 px-6 rounded-3xl shadow-2xl shadow-black/20 flex items-center justify-center gap-3 active:scale-[0.97] transition-transform"
         >
-          <div className="absolute inset-0 bg-white/20 rounded-3xl anim-pulse-ring" />
-          <div className="relative bg-white text-airport-blue font-bold text-lg py-5 px-6 rounded-3xl shadow-2xl shadow-black/20 flex items-center justify-center gap-3 active:scale-[0.97] transition-transform">
-            <span className="text-2xl anim-bounce">📷</span>
-            Scan an Item
-          </div>
+          <span className="text-2xl">📷</span>
+          Scan an Item
         </button>
       </div>
 
@@ -66,15 +94,15 @@ export default function HomeScreen() {
               Recent Scans
             </h2>
             <div className="space-y-2.5">
-              {history.map((rec, i) => {
+              {history.map((rec) => {
                 const v = worst(rec.result.handBaggage.verdict, rec.result.checkedBaggage.verdict);
                 return (
                   <button
                     key={rec.id}
                     onClick={() => viewHistoryItem(rec)}
-                    className={`anim-fade-in-up anim-delay-${Math.min(i, 3) + 1} w-full bg-white rounded-2xl p-4 flex items-center gap-4 shadow-sm hover:shadow-md transition-all text-left`}
+                    className="anim-fade-in-up w-full bg-white rounded-2xl p-4 flex items-center gap-4 shadow-sm hover:shadow-md transition-all text-left"
                   >
-                    <div className={`w-10 h-10 rounded-xl ${dotColor[v]} bg-opacity-15 flex items-center justify-center`}>
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center`} style={{ backgroundColor: `${dotColor[v] === 'bg-emerald-500' ? '#d1fae5' : dotColor[v] === 'bg-amber-500' ? '#fef3c7' : '#fee2e2'}` }}>
                       <span className={`w-3 h-3 rounded-full ${dotColor[v]}`} />
                     </div>
                     <div className="flex-1 min-w-0">

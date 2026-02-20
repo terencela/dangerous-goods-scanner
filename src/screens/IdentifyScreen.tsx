@@ -1,40 +1,47 @@
-import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
 import { itemCategories, categoryGroups, getCategoryById } from '../data/categories';
 import { getQuestionsForCategory } from '../data/questions';
-import { classifyImage, type CategoryMatch } from '../utils/classifier';
+import { classifyWithVision, type DetectionResult } from '../utils/classifier';
+import { getApiKey, hasApiKey } from '../utils/storage';
 
-type Phase = 'analyzing' | 'detected' | 'manual';
+type Phase = 'analyzing' | 'detected' | 'error' | 'manual';
 
 export default function IdentifyScreen() {
   const { goTo, session, selectCategory, computeResult } = useApp();
-  const imgRef = useRef<HTMLImageElement>(null);
-  const [phase, setPhase] = useState<Phase>(session.photoUrl ? 'analyzing' : 'manual');
-  const [matches, setMatches] = useState<CategoryMatch[]>([]);
+  const [phase, setPhase] = useState<Phase>(() => {
+    if (session.photoUrl && hasApiKey()) return 'analyzing';
+    return 'manual';
+  });
+  const [detection, setDetection] = useState<DetectionResult | null>(null);
   const [search, setSearch] = useState('');
 
   const runDetection = useCallback(async () => {
-    if (!imgRef.current) return;
+    if (!session.photoUrl) { setPhase('manual'); return; }
+    const key = getApiKey();
+    if (!key) { setPhase('manual'); return; }
+
     try {
-      const results = await classifyImage(imgRef.current);
-      setMatches(results);
-      setPhase(results.length > 0 ? 'detected' : 'manual');
+      const result = await classifyWithVision(session.photoUrl, key);
+      setDetection(result);
+
+      if (result.error) {
+        setPhase('error');
+      } else if (result.category && result.confidence > 0.3) {
+        setPhase('detected');
+      } else {
+        setPhase('manual');
+      }
     } catch {
       setPhase('manual');
     }
-  }, []);
+  }, [session.photoUrl]);
 
   useEffect(() => {
-    if (phase !== 'analyzing' || !session.photoUrl) return;
-    const img = imgRef.current;
-    if (!img) return;
-
-    if (img.complete && img.naturalWidth > 0) {
+    if (phase === 'analyzing') {
       runDetection();
-    } else {
-      img.onload = runDetection;
     }
-  }, [phase, session.photoUrl, runDetection]);
+  }, [phase, runDetection]);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
@@ -68,69 +75,58 @@ export default function IdentifyScreen() {
     }
   };
 
-  // Hidden image element for TF.js classification
-  const hiddenImg = session.photoUrl ? (
-    <img
-      ref={imgRef}
-      src={session.photoUrl}
-      alt=""
-      crossOrigin="anonymous"
-      className="hidden"
-    />
-  ) : null;
-
-  /* ---- Analyzing Phase ---- */
+  /* ---- Analyzing ---- */
   if (phase === 'analyzing') {
     return (
       <div className="min-h-full flex flex-col bg-airport-light">
-        {hiddenImg}
         <div className="flex-1 flex flex-col items-center justify-center px-8">
-          {/* Photo with scanning overlay */}
-          <div className="relative w-52 h-52 rounded-3xl overflow-hidden shadow-xl mb-8">
-            <img src={session.photoUrl!} alt="Your item" className="w-full h-full object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-b from-airport-blue/20 to-airport-blue/40" />
-            <div className="absolute inset-x-0 h-1 bg-emerald-400/80 shadow-[0_0_12px_rgba(16,185,129,.6)] anim-scan-line" />
-          </div>
+          {session.photoUrl && (
+            <div className="relative w-48 h-48 rounded-3xl overflow-hidden shadow-xl mb-8">
+              <img src={session.photoUrl} alt="Your item" className="w-full h-full object-cover" />
+              <div className="absolute inset-0 bg-gradient-to-b from-airport-blue/10 to-airport-blue/30" />
+              <div className="absolute inset-x-0 h-1 bg-emerald-400/80 shadow-[0_0_12px_rgba(16,185,129,.6)] anim-scan-line" />
+            </div>
+          )}
           <div className="flex items-center gap-3 mb-3">
             <div className="w-5 h-5 border-[2.5px] border-slate-300 border-t-airport-blue rounded-full animate-spin" />
-            <p className="text-base font-bold text-slate-700">Analyzing your item…</p>
+            <p className="text-base font-bold text-slate-700">Identifying your item…</p>
           </div>
           <p className="text-sm text-slate-400 text-center">
-            AI is identifying what this is
+            GPT-4o Vision is analyzing the photo
           </p>
         </div>
       </div>
     );
   }
 
-  /* ---- Detected Phase ---- */
-  if (phase === 'detected' && matches.length > 0) {
-    const best = matches[0];
-    const others = matches.slice(1, 4);
-    const pct = Math.round(best.confidence * 100);
+  /* ---- Detected ---- */
+  if (phase === 'detected' && detection?.category) {
+    const cat = detection.category;
+    const pct = Math.round(detection.confidence * 100);
 
     return (
       <div className="min-h-full flex flex-col bg-airport-light">
-        {hiddenImg}
-
-        {/* Photo + result */}
         <div className="bg-white px-5 pt-14 pb-6 shadow-sm">
           <button onClick={() => goTo('camera')} className="text-sm text-slate-400 font-medium mb-5 block">
             ← Retake Photo
           </button>
 
           <div className="flex items-start gap-5 anim-fade-in-up">
-            <div className="w-24 h-24 rounded-2xl overflow-hidden shadow-md flex-shrink-0">
-              <img src={session.photoUrl!} alt="Item" className="w-full h-full object-cover" />
-            </div>
+            {session.photoUrl && (
+              <div className="w-24 h-24 rounded-2xl overflow-hidden shadow-md flex-shrink-0">
+                <img src={session.photoUrl} alt="Item" className="w-full h-full object-cover" />
+              </div>
+            )}
             <div className="flex-1 min-w-0 pt-1">
-              <p className="text-xs font-bold text-emerald-600 uppercase tracking-widest mb-1.5">
+              <p className="text-xs font-bold text-emerald-600 uppercase tracking-widest mb-1">
                 Detected
               </p>
               <p className="text-lg font-bold text-slate-800 leading-snug">
-                {best.category.icon} {best.category.name}
+                {cat.icon} {cat.name}
               </p>
-              {/* Confidence bar */}
+              {detection.itemName && (
+                <p className="text-xs text-slate-400 mt-1">{detection.itemName}</p>
+              )}
               <div className="mt-3 flex items-center gap-2.5">
                 <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
                   <div
@@ -145,53 +141,65 @@ export default function IdentifyScreen() {
         </div>
 
         <div className="flex-1 px-5 py-5 overflow-y-auto">
-          {/* Primary action */}
           <button
-            onClick={() => handleSelect(best.category.id)}
+            onClick={() => handleSelect(cat.id)}
             className="w-full bg-airport-blue text-white font-bold py-4 rounded-2xl shadow-lg active:scale-[0.97] transition-transform anim-fade-in-up"
           >
             Yes, This Is Correct →
           </button>
 
-          {/* Other suggestions */}
-          {others.length > 0 && (
-            <div className="mt-6 anim-fade-in-up anim-delay-1">
-              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-2.5">
-                Other Possibilities
-              </p>
-              <div className="space-y-2">
-                {others.map((m) => (
-                  <button
-                    key={m.category.id}
-                    onClick={() => handleSelect(m.category.id)}
-                    className="w-full bg-white rounded-xl p-3.5 flex items-center gap-3 shadow-sm text-left hover:shadow-md transition-shadow"
-                  >
-                    <span className="text-xl">{m.category.icon}</span>
-                    <span className="text-sm font-medium text-slate-700 flex-1">{m.category.name}</span>
-                    <span className="text-xs text-slate-400">{Math.round(m.confidence * 100)}%</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Manual fallback */}
           <button
             onClick={() => setPhase('manual')}
-            className="w-full mt-6 text-center text-sm font-semibold text-airport-blue py-3 anim-fade-in-up anim-delay-2"
+            className="w-full mt-4 text-center text-sm font-semibold text-airport-blue py-3 anim-fade-in-up anim-delay-1"
           >
-            None of these — select manually
+            Not correct — select manually
           </button>
         </div>
       </div>
     );
   }
 
-  /* ---- Manual Phase ---- */
+  /* ---- Error ---- */
+  if (phase === 'error' && detection?.error) {
+    return (
+      <div className="min-h-full flex flex-col bg-airport-light">
+        <header className="bg-white shadow-sm px-5 pt-14 pb-5">
+          <div className="max-w-lg mx-auto">
+            <button onClick={() => goTo('camera')} className="text-sm text-slate-400 font-medium mb-3 block">
+              ← Back
+            </button>
+          </div>
+        </header>
+        <div className="flex-1 flex flex-col items-center justify-center px-8 anim-fade-in">
+          <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mb-5">
+            <span className="text-3xl">⚠️</span>
+          </div>
+          <p className="text-base font-bold text-slate-700 mb-2 text-center">Detection Failed</p>
+          <p className="text-sm text-slate-400 text-center leading-relaxed mb-6 max-w-xs">
+            {detection.error}
+          </p>
+          <div className="flex gap-3 w-full max-w-xs">
+            <button
+              onClick={() => goTo('settings')}
+              className="flex-1 bg-white text-slate-600 font-semibold py-3 rounded-xl border border-slate-200 text-sm"
+            >
+              Settings
+            </button>
+            <button
+              onClick={() => setPhase('manual')}
+              className="flex-1 bg-airport-blue text-white font-semibold py-3 rounded-xl text-sm"
+            >
+              Select Manually
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  /* ---- Manual Selection ---- */
   return (
     <div className="min-h-full flex flex-col bg-airport-light">
-      {hiddenImg}
-
       <header className="bg-white shadow-sm px-5 pt-14 pb-4">
         <div className="max-w-lg mx-auto">
           <div className="flex items-center gap-3 mb-4">
@@ -210,14 +218,7 @@ export default function IdentifyScreen() {
                 alt="Item"
                 className="w-12 h-12 rounded-xl object-cover border border-slate-200"
               />
-              <div>
-                <p className="text-xs text-slate-400">Your captured item</p>
-                {matches.length > 0 && (
-                  <button onClick={() => setPhase('detected')} className="text-xs text-airport-blue font-semibold mt-0.5">
-                    ← Back to AI results
-                  </button>
-                )}
-              </div>
+              <p className="text-xs text-slate-400">Your captured item</p>
             </div>
           )}
 
