@@ -1,0 +1,35 @@
+@import "tailwindcss";
+
+@theme {
+  --color-verdict-green: #16a34a;
+  --color-verdict-amber: #d97706;
+  --color-verdict-red: #dc2626;
+  --color-airport-blue: #1e3a5f;
+  --color-airport-light: #f0f4f8;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  background-color: var(--color-airport-light);
+}
+
+video {
+  object-fit: cover;
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+}
