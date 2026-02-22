@@ -1,3 +1,5 @@
+import type { AiAnalysis } from '../utils/classifier';
+
 export type Screen = 'home' | 'camera' | 'identify' | 'wizard' | 'result' | 'settings';
 
 export type Verdict = 'allowed' | 'conditional' | 'not_allowed';
@@ -43,6 +45,7 @@ export interface ScanRecord {
   result: RuleResult;
   photoUrl?: string;
   timestamp: number;
+  aiAnalysis?: AiAnalysis;
 }
 
 export interface ScanSession {
@@ -50,4 +53,5 @@ export interface ScanSession {
   categoryId?: string;
   answers: Record<string, string | number | boolean>;
   result?: RuleResult;
+  aiAnalysis?: AiAnalysis;
 }

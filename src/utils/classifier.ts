@@ -1,41 +1,114 @@
-import type { ItemCategory } from '../types';
-import { itemCategories } from '../data/categories';
+const CATEGORIES_INFO = [
+  { id: 'battery-spare', name: 'Spare Battery / Power Bank', keywords: 'power bank, portable charger, spare battery, external battery, battery pack' },
+  { id: 'battery-installed', name: 'Battery Installed in Device', keywords: 'laptop battery, phone battery, tablet battery, device with built-in battery' },
+  { id: 'liquids', name: 'Liquids, Gels & Aerosols', keywords: 'water, perfume, shampoo, lotion, gel, spray, deodorant, toothpaste, cream, drink, juice, oil' },
+  { id: 'knife', name: 'Knife', keywords: 'knife, pocket knife, swiss army knife, utility knife, kitchen knife, hunting knife' },
+  { id: 'scissors', name: 'Scissors', keywords: 'scissors, shears, craft scissors, nail scissors' },
+  { id: 'tools', name: 'Tools', keywords: 'screwdriver, wrench, pliers, hammer tool, multi-tool, spanner' },
+  { id: 'lighter', name: 'Lighter', keywords: 'lighter, zippo, gas lighter, cigarette lighter, torch lighter' },
+  { id: 'matches', name: 'Matches', keywords: 'matches, matchbox, matchstick' },
+  { id: 'e-cigarettes', name: 'E-Cigarette / Vape', keywords: 'e-cigarette, vape, vaping device, e-pipe, juul, vape pen, iqos' },
+  { id: 'electronics', name: 'Laptop / Tablet / Phone / Camera', keywords: 'laptop, tablet, phone, camera, smartphone, macbook, ipad, DSLR, gopro, kindle' },
+  { id: 'smart-luggage-removable', name: 'Smart Luggage (removable battery)', keywords: 'smart suitcase, smart luggage with removable battery' },
+  { id: 'smart-luggage-permanent', name: 'Smart Luggage (built-in battery)', keywords: 'smart suitcase with permanent battery' },
+  { id: 'luggage-trackers', name: 'Luggage Tracker', keywords: 'airtag, tile tracker, luggage tracker, gps tracker' },
+  { id: 'electronic-bag-tags', name: 'Electronic Bag Tags', keywords: 'electronic bag tag, EBTS, e-tag' },
+  { id: 'blunt-objects', name: 'Blunt Objects', keywords: 'baseball bat, golf club, hammer, cricket bat, hockey stick' },
+  { id: 'sports-equipment', name: 'Sports Equipment', keywords: 'tennis racket, badminton racket, ski poles, hiking poles, racket' },
+  { id: 'fireworks', name: 'Fireworks / Sparklers', keywords: 'fireworks, sparklers, firecrackers, pyrotechnics' },
+  { id: 'fuel-paste', name: 'Fuel Paste / Flammable Liquids', keywords: 'fuel, gasoline, lighter fluid, flammable liquid' },
+  { id: 'toxic-corrosive', name: 'Acids / Toxic / Corrosive', keywords: 'acid, bleach, corrosive, toxic chemical, poison' },
+  { id: 'gas-cartridges', name: 'Gas Cartridges / Compressed Gas', keywords: 'gas cartridge, compressed gas, propane, butane, pepper spray' },
+  { id: 'paints', name: 'Paints / Solvents', keywords: 'paint, paint thinner, solvent, turpentine, acetone' },
+];
 
-const SYSTEM_PROMPT = `You are an airport security item classifier for Zurich Airport (ZRH).
-Given an image, identify the item and classify it into exactly ONE of these categories:
+const SYSTEM_PROMPT = `You are a Zurich Airport (ZRH) security expert. Your job is to identify items in photos and give a COMPLETE verdict on whether they are allowed in hand baggage and checked baggage.
 
-1. batteries — Lithium batteries, power banks, rechargeable batteries, battery packs
-2. e-cigarettes — E-cigarettes, vapes, e-pipes, e-cigars, vape pens, IQOS
-3. electronics — Laptops, tablets, phones, cameras, headphones, electronic devices
-4. smart-luggage-removable — Smart suitcase with removable battery
-5. smart-luggage-permanent — Smart suitcase with non-removable battery
-6. luggage-trackers — AirTag, Tile, small GPS trackers
-7. electronic-bag-tags — Electronic bag tags (EBTS)
-8. liquids — Liquids, gels, creams, sprays, pastes, aerosols, drinks, perfume, shampoo
-9. knives-scissors — Knives, scissors, blades, box cutters, multi-tools
-10. tools — Screwdrivers, wrenches, pliers, drills, saws
-11. lighters-matches — Lighters, matches, Zippos
-12. blunt-objects — Baseball bats, golf clubs, hammers, martial arts equipment, hockey sticks
-13. prohibited — Fireworks, sparklers, fuel paste, gas cartridges, acids, toxic/corrosive substances
+CATEGORIES:
+${CATEGORIES_INFO.map(c => `- ID: "${c.id}" | Name: "${c.name}" | Keywords: ${c.keywords}`).join('\n')}
 
-Respond ONLY with valid JSON. No other text.
-{"categoryId":"one-of-the-ids-above","confidence":0.95,"itemName":"Short name of detected item"}
+ZURICH AIRPORT RULES:
+- Spare batteries/power banks: Under 100 Wh = hand baggage allowed (tape terminals, max 20). 100-160 Wh = max 2, airline approval required. Over 160 Wh = prohibited. ALWAYS prohibited in checked baggage.
+- Devices with built-in battery: Under 100 Wh = allowed. 100-160 Wh = allowed with airline approval. Over 160 Wh = prohibited. Checked baggage: device must be switched off.
+- Liquids: Hand baggage max 100 ml per container, in transparent 1-litre resealable bag. Medication/baby food exempt. Duty-free with sealed bag and receipt allowed. Checked baggage: no size limit. 100ml/1L rule in effect until at least summer 2026.
+- Knives/scissors/tools: Blade/length under 6 cm = hand baggage allowed. 6 cm or longer = checked baggage only.
+- Lighters: Prohibited in all baggage. Only 1 lighter on your person allowed.
+- Matches: Prohibited in all baggage. Only 1 box on your person allowed.
+- E-cigarettes/vapes: Hand baggage only. Never in checked baggage.
+- Smart luggage with removable battery: Remove battery, carry in hand baggage. Luggage can be checked.
+- Smart luggage with fixed battery: Prohibited.
+- Fireworks, fuel paste, toxic/corrosive, gas cartridges, paints/solvents: ALWAYS prohibited in all baggage.
+- Blunt objects (bats, clubs, hammers): Checked baggage only.
+- Sports equipment (rackets, poles): Checked baggage only.
 
-If you cannot classify the item or it does not fit any category, use:
-{"categoryId":"unknown","confidence":0,"itemName":"description of what you see"}`;
+YOUR TASK when you see an image:
+1. Identify the item
+2. Read ALL visible technical data from labels (mAh, Wh, V, ml, cm, weight) — the user should NOT have to type anything
+3. Apply the rules and give the COMPLETE verdict
+4. Respond in English
 
-export interface DetectionResult {
-  category: ItemCategory | null;
-  categoryId: string;
-  confidence: number;
-  itemName: string;
+Respond ONLY with valid JSON (no markdown, no backticks):
+{
+  "identified": true,
+  "itemName": "Descriptive name of the item",
+  "categoryId": "one of the category IDs above",
+  "confidence": "high" | "medium" | "low",
+  "detectedProperties": {
+    "mah": number or null,
+    "voltage": number or null,
+    "wh": number or null,
+    "volume_ml": number or null,
+    "blade_length_cm": number or null
+  },
+  "verdict": {
+    "handBaggage": {
+      "status": "allowed" | "conditional" | "not_allowed",
+      "text": "Clear explanation for the traveller",
+      "tip": "Optional helpful tip"
+    },
+    "checkedBaggage": {
+      "status": "allowed" | "conditional" | "not_allowed",
+      "text": "Clear explanation",
+      "tip": "Optional helpful tip"
+    }
+  },
+  "summary": "Short summary of what you detected and how you reached the verdict"
+}
+
+If you cannot identify the item:
+{"identified": false, "summary": "Explanation of why not identifiable"}
+
+IMPORTANT:
+- ALWAYS return a complete verdict when identified=true
+- For batteries: read mAh/Wh from the label and compute the verdict yourself
+- For liquids: read ml from the label
+- For knives/scissors: estimate the blade length
+- Write clearly for a normal traveller, not a technician`;
+
+export interface AiAnalysis {
+  identified: boolean;
+  itemName?: string;
+  categoryId?: string;
+  confidence?: 'high' | 'medium' | 'low';
+  detectedProperties?: {
+    mah?: number | null;
+    voltage?: number | null;
+    wh?: number | null;
+    volume_ml?: number | null;
+    blade_length_cm?: number | null;
+  };
+  verdict?: {
+    handBaggage: { status: string; text: string; tip?: string };
+    checkedBaggage: { status: string; text: string; tip?: string };
+  };
+  summary?: string;
   error?: string;
 }
 
 export async function classifyWithVision(
   base64DataUrl: string,
   apiKey: string
-): Promise<DetectionResult> {
+): Promise<AiAnalysis> {
   try {
     const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -52,16 +125,16 @@ export async function classifyWithVision(
             content: [
               {
                 type: 'text',
-                text: 'Identify this item for airport security purposes. What category does it belong to?',
+                text: 'Identify this item, read all visible technical data from the label, and give the complete verdict for Zurich Airport baggage security.',
               },
               {
                 type: 'image_url',
-                image_url: { url: base64DataUrl, detail: 'low' },
+                image_url: { url: base64DataUrl, detail: 'high' },
               },
             ],
           },
         ],
-        max_tokens: 150,
+        max_tokens: 800,
         temperature: 0.1,
       }),
     });
@@ -69,48 +142,27 @@ export async function classifyWithVision(
     if (!res.ok) {
       const errBody = await res.json().catch(() => null);
       if (res.status === 401) {
-        return { category: null, categoryId: 'error', confidence: 0, itemName: '', error: 'Invalid API key. Please check your OpenAI API key in settings.' };
+        return { identified: false, error: 'Invalid API key. Please check your OpenAI API key in settings.' };
       }
       if (res.status === 429) {
-        return { category: null, categoryId: 'error', confidence: 0, itemName: '', error: 'Rate limit reached. Please wait a moment and try again.' };
+        return { identified: false, error: 'Rate limit reached. Please wait a moment and try again.' };
       }
-      return {
-        category: null,
-        categoryId: 'error',
-        confidence: 0,
-        itemName: '',
-        error: errBody?.error?.message || `API error (${res.status})`,
-      };
+      return { identified: false, error: errBody?.error?.message || `API error (${res.status})` };
     }
 
     const data = await res.json();
     const content: string = data.choices?.[0]?.message?.content || '';
 
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    const cleaned = content.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+    const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
-      return { category: null, categoryId: 'unknown', confidence: 0, itemName: content.slice(0, 60), error: 'Could not parse AI response.' };
+      return { identified: false, error: 'Could not parse AI response.' };
     }
 
-    const parsed = JSON.parse(jsonMatch[0]) as {
-      categoryId: string;
-      confidence: number;
-      itemName: string;
-    };
-
-    const cat = itemCategories.find((c) => c.id === parsed.categoryId) || null;
-
-    return {
-      category: cat,
-      categoryId: parsed.categoryId,
-      confidence: parsed.confidence,
-      itemName: parsed.itemName,
-    };
+    return JSON.parse(jsonMatch[0]) as AiAnalysis;
   } catch (err) {
     return {
-      category: null,
-      categoryId: 'error',
-      confidence: 0,
-      itemName: '',
+      identified: false,
       error: err instanceof Error ? err.message : 'Network error. Check your connection.',
     };
   }

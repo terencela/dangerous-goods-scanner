@@ -1,21 +1,21 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
 import type { Screen, ScanSession, ScanRecord, RuleResult } from '../types';
+import type { AiAnalysis } from '../utils/classifier';
 import { getCategoryById } from '../data/categories';
 import { evaluateRules } from '../data/rules';
 import { loadHistory, saveRecord, generateId } from '../utils/storage';
 
-interface AppState {
+interface AppContextType {
   screen: Screen;
   session: ScanSession;
   history: ScanRecord[];
   selectedHistoryItem: ScanRecord | null;
-}
-
-interface AppContextType extends AppState {
   goTo: (screen: Screen) => void;
   setPhoto: (url: string) => void;
   selectCategory: (id: string) => void;
   setAnswers: (answers: Record<string, string | number | boolean>) => void;
+  setAiAnalysis: (analysis: AiAnalysis) => void;
+  applyAiVerdict: (analysis: AiAnalysis) => void;
   computeResult: () => RuleResult;
   saveCurrentScan: () => void;
   resetSession: () => void;
@@ -48,6 +48,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setSession((prev) => ({ ...prev, answers }));
   }, []);
 
+  const setAiAnalysis = useCallback((analysis: AiAnalysis) => {
+    setSession((prev) => ({ ...prev, aiAnalysis: analysis }));
+  }, []);
+
+  const applyAiVerdict = useCallback((analysis: AiAnalysis) => {
+    if (!analysis.verdict || !analysis.categoryId) return;
+    const result: RuleResult = {
+      handBaggage: {
+        verdict: analysis.verdict.handBaggage.status as RuleResult['handBaggage']['verdict'],
+        message: analysis.verdict.handBaggage.text,
+        tip: analysis.verdict.handBaggage.tip,
+      },
+      checkedBaggage: {
+        verdict: analysis.verdict.checkedBaggage.status as RuleResult['checkedBaggage']['verdict'],
+        message: analysis.verdict.checkedBaggage.text,
+        tip: analysis.verdict.checkedBaggage.tip,
+      },
+    };
+    setSession((prev) => ({
+      ...prev,
+      categoryId: analysis.categoryId,
+      aiAnalysis: analysis,
+      result,
+    }));
+  }, []);
+
   const computeResult = useCallback((): RuleResult => {
     const result = evaluateRules(session.categoryId || '', session.answers);
     setSession((prev) => ({ ...prev, result }));
@@ -60,11 +86,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const record: ScanRecord = {
       id: generateId(),
       categoryId: session.categoryId,
-      categoryName: cat?.name || session.categoryId,
+      categoryName: cat?.name || session.aiAnalysis?.itemName || session.categoryId,
       answers: session.answers,
       result: session.result,
       photoUrl: session.photoUrl,
       timestamp: Date.now(),
+      aiAnalysis: session.aiAnalysis,
     };
     saveRecord(record);
     setHistory(loadHistory());
@@ -91,20 +118,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   return (
     <AppContext.Provider
       value={{
-        screen,
-        session,
-        history,
-        selectedHistoryItem,
-        goTo,
-        setPhoto,
-        selectCategory,
-        setAnswers,
-        computeResult,
-        saveCurrentScan,
-        resetSession,
-        refreshHistory,
-        viewHistoryItem,
-        clearSelectedHistory,
+        screen, session, history, selectedHistoryItem,
+        goTo, setPhoto, selectCategory, setAnswers, setAiAnalysis,
+        applyAiVerdict, computeResult, saveCurrentScan, resetSession,
+        refreshHistory, viewHistoryItem, clearSelectedHistory,
       }}
     >
       {children}

@@ -1,45 +1,44 @@
 import type { Question } from '../types';
 
 export const questions: Question[] = [
-  // Batteries
+  // Spare Battery / Power Bank
   {
-    id: 'battery-mah',
-    categoryId: 'batteries',
-    text: 'What is the battery capacity in mAh?',
-    type: 'number',
-    unit: 'mAh',
-    placeholder: 'e.g. 5000',
-    order: 1,
-  },
-  {
-    id: 'battery-voltage',
-    categoryId: 'batteries',
-    text: 'What is the voltage?',
-    type: 'number',
-    unit: 'V',
-    placeholder: 'e.g. 3.7',
-    order: 2,
-  },
-  {
-    id: 'battery-installed',
-    categoryId: 'batteries',
-    text: 'Is the battery installed in a device or is it a spare?',
+    id: 'battery-size',
+    categoryId: 'battery-spare',
+    text: 'What kind of power bank / spare battery do you have?',
     type: 'select',
     options: [
-      { label: 'Installed in a device', value: 'installed' },
-      { label: 'Spare / loose battery', value: 'spare' },
+      { label: 'Standard (phone charger, small power bank — under 100 Wh)', value: 'small' },
+      { label: 'Large (laptop power bank, high capacity — 100–160 Wh)', value: 'large' },
+      { label: 'Very large / Industrial (over 160 Wh)', value: 'xlarge' },
     ],
-    order: 3,
+    order: 1,
+  },
+
+  // Battery Installed in Device
+  {
+    id: 'device-type',
+    categoryId: 'battery-installed',
+    text: 'What kind of device is it?',
+    type: 'select',
+    options: [
+      { label: 'Phone, tablet, camera or similar', value: 'small' },
+      { label: 'Laptop or larger device', value: 'medium' },
+      { label: 'Very large device (e-bike battery, etc.)', value: 'large' },
+    ],
+    order: 1,
   },
 
   // Liquids
   {
-    id: 'liquid-volume',
+    id: 'container-size',
     categoryId: 'liquids',
-    text: 'What is the container volume in ml?',
-    type: 'number',
-    unit: 'ml',
-    placeholder: 'e.g. 100',
+    text: 'Is the container travel-sized (100 ml or smaller)?',
+    type: 'select',
+    options: [
+      { label: 'Yes, 100 ml or smaller', value: 'small' },
+      { label: 'No, larger than 100 ml', value: 'large' },
+    ],
     order: 1,
   },
   {
@@ -48,7 +47,7 @@ export const questions: Question[] = [
     text: 'What type of liquid is it?',
     type: 'select',
     options: [
-      { label: 'Regular liquid (cosmetics, drinks, etc.)', value: 'regular' },
+      { label: 'Regular liquid (perfume, shampoo, etc.)', value: 'regular' },
       { label: 'Medication', value: 'medication' },
       { label: 'Baby food / special dietary food', value: 'baby-food' },
       { label: 'Duty-free purchase (with receipt & sealed bag)', value: 'duty-free' },
@@ -56,49 +55,43 @@ export const questions: Question[] = [
     order: 2,
   },
 
-  // Knives & Scissors
+  // Knife
   {
-    id: 'blade-length',
-    categoryId: 'knives-scissors',
-    text: 'What is the blade length in cm?',
-    type: 'number',
-    unit: 'cm',
-    placeholder: 'e.g. 5',
+    id: 'knife-blade',
+    categoryId: 'knife',
+    text: 'Is the blade shorter than 6 cm?',
+    type: 'select',
+    options: [
+      { label: 'Yes, shorter than 6 cm', value: 'short' },
+      { label: 'No, 6 cm or longer', value: 'long' },
+    ],
+    order: 1,
+  },
+
+  // Scissors
+  {
+    id: 'scissors-blade',
+    categoryId: 'scissors',
+    text: 'Is the blade shorter than 6 cm?',
+    type: 'select',
+    options: [
+      { label: 'Yes, shorter than 6 cm (e.g. nail scissors)', value: 'short' },
+      { label: 'No, 6 cm or longer', value: 'long' },
+    ],
     order: 1,
   },
 
   // Tools
   {
-    id: 'tool-length',
+    id: 'tool-size',
     categoryId: 'tools',
-    text: 'What is the tool/blade length in cm?',
-    type: 'number',
-    unit: 'cm',
-    placeholder: 'e.g. 8',
-    order: 1,
-  },
-
-  // Lighters & Matches
-  {
-    id: 'lighter-carry',
-    categoryId: 'lighters-matches',
-    text: 'Where do you plan to carry it?',
+    text: 'Is the tool shorter than 6 cm?',
     type: 'select',
     options: [
-      { label: 'On my person (pocket / clothing)', value: 'person' },
-      { label: 'In my hand baggage', value: 'hand' },
-      { label: 'In my checked baggage', value: 'checked' },
+      { label: 'Yes, shorter than 6 cm', value: 'short' },
+      { label: 'No, 6 cm or longer', value: 'long' },
     ],
     order: 1,
-  },
-  {
-    id: 'lighter-quantity',
-    categoryId: 'lighters-matches',
-    text: 'How many lighters or matchboxes?',
-    type: 'number',
-    unit: 'pieces',
-    placeholder: 'e.g. 1',
-    order: 2,
   },
 ];
 
