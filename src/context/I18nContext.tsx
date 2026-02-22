@@ -12,9 +12,9 @@ const LANG_KEY = 'zrh-lang';
 function getInitialLang(): Language {
   try {
     const stored = localStorage.getItem(LANG_KEY);
-    if (stored === 'de' || stored === 'en') return stored;
+    if (stored === 'de' || stored === 'en' || stored === 'fr') return stored;
     const nav = navigator.language?.toLowerCase() || '';
-    return nav.startsWith('de') ? 'de' : 'en';
+    return nav.startsWith('de') ? 'de' : nav.startsWith('fr') ? 'fr' : 'en';
   } catch {
     return 'en';
   }

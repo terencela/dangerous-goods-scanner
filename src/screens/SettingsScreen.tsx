@@ -41,16 +41,19 @@ export default function SettingsScreen() {
                 <span className="text-base">🌐</span>
               </div>
               <div>
-                <p className="text-sm font-semibold text-[#0a0a0a]">Language / Sprache</p>
-                <p className="text-xs text-[#999]">{lang === 'de' ? 'Deutsch' : 'English'}</p>
+                <p className="text-sm font-semibold text-[#0a0a0a]">Language / Sprache / Langue</p>
+                <p className="text-xs text-[#999]">{lang === 'de' ? 'Deutsch' : lang === 'fr' ? 'Français' : 'English'}</p>
               </div>
             </div>
-            <button
-              onClick={() => setLang(lang === 'de' ? 'en' : 'de')}
-              className="px-3 py-1.5 rounded-md border border-[#e5e5e5] text-xs font-semibold text-[#666] hover:bg-[#f5f5f5] transition-colors"
+            <select
+              value={lang}
+              onChange={(e) => setLang(e.target.value as any)}
+              className="px-2 py-1.5 rounded-md border border-[#e5e5e5] text-xs font-semibold text-[#666] bg-white outline-none cursor-pointer"
             >
-              {lang === 'de' ? 'Switch to EN' : 'Zu DE wechseln'}
-            </button>
+              <option value="en">English</option>
+              <option value="de">Deutsch</option>
+              <option value="fr">Français</option>
+            </select>
           </div>
         </div>
 

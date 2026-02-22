@@ -49,10 +49,10 @@ export default function HomeScreen() {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setLang(lang === 'de' ? 'en' : 'de')}
+            onClick={() => setLang(lang === 'de' ? 'en' : lang === 'en' ? 'fr' : 'de')}
             className="px-2.5 py-1 rounded-md border border-[#e5e5e5] bg-white text-xs font-semibold text-[#666] tracking-wide hover:bg-[#f5f5f5] transition-colors"
           >
-            {lang === 'de' ? 'EN' : 'DE'}
+            {lang === 'de' ? 'EN' : lang === 'en' ? 'FR' : 'DE'}
           </button>
           <button
             onClick={() => goTo('settings')}
