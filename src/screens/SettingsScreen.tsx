@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { useApp } from '../context/AppContext';
+import { useI18n } from '../context/I18nContext';
 import { getApiKey, setApiKey } from '../utils/storage';
 
 export default function SettingsScreen() {
   const { goTo } = useApp();
+  const { t, lang, setLang } = useI18n();
   const [key, setKey] = useState(() => getApiKey());
   const [saved, setSaved] = useState(false);
 
@@ -14,26 +16,53 @@ export default function SettingsScreen() {
   };
 
   return (
-    <div className="min-h-full flex flex-col bg-airport-light">
-      <header className="bg-white shadow-sm px-5 pt-14 pb-5">
+    <div className="min-h-full flex flex-col bg-[#fafafa]">
+      <div className="bg-white border-b border-[#e5e5e5] px-5 pt-14 pb-4">
         <div className="max-w-lg mx-auto">
-          <button onClick={() => goTo('home')} className="text-sm text-slate-400 font-medium mb-4 block">
-            ← Back
-          </button>
-          <h1 className="text-xl font-bold text-slate-800">Settings</h1>
+          <div className="flex items-center justify-between">
+            <button onClick={() => goTo('home')} className="text-sm text-[#999] font-medium flex items-center gap-1">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+              </svg>
+              {t('back')}
+            </button>
+            <h1 className="text-[15px] font-semibold text-[#0a0a0a]">{t('settings')}</h1>
+            <div className="w-12" />
+          </div>
         </div>
-      </header>
+      </div>
 
-      <main className="flex-1 px-5 py-6 max-w-lg mx-auto w-full">
+      <main className="flex-1 px-5 py-5 max-w-lg mx-auto w-full">
+        {/* Language */}
+        <div className="bg-white rounded-[10px] p-4 border border-[#e5e5e5] mb-4 anim-fade-in-up">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-[#f2f2f2] rounded-[10px] flex items-center justify-center">
+                <span className="text-base">🌐</span>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-[#0a0a0a]">Language / Sprache</p>
+                <p className="text-xs text-[#999]">{lang === 'de' ? 'Deutsch' : 'English'}</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setLang(lang === 'de' ? 'en' : 'de')}
+              className="px-3 py-1.5 rounded-md border border-[#e5e5e5] text-xs font-semibold text-[#666] hover:bg-[#f5f5f5] transition-colors"
+            >
+              {lang === 'de' ? 'Switch to EN' : 'Zu DE wechseln'}
+            </button>
+          </div>
+        </div>
+
         {/* API Key */}
-        <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 anim-fade-in-up">
+        <div className="bg-white rounded-[10px] p-4 border border-[#e5e5e5] anim-fade-in-up anim-delay-1">
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 bg-airport-blue/10 rounded-xl flex items-center justify-center">
-              <span className="text-lg">🔑</span>
+            <div className="w-10 h-10 bg-[#f2f2f2] rounded-[10px] flex items-center justify-center">
+              <span className="text-base">🔑</span>
             </div>
             <div>
-              <h2 className="text-sm font-bold text-slate-800">OpenAI API Key</h2>
-              <p className="text-xs text-slate-400">Required for AI item detection</p>
+              <h2 className="text-sm font-semibold text-[#0a0a0a]">{t('apiKey')}</h2>
+              <p className="text-xs text-[#999]">{t('apiKeyRequired')}</p>
             </div>
           </div>
 
@@ -42,50 +71,50 @@ export default function SettingsScreen() {
             value={key}
             onChange={(e) => { setKey(e.target.value); setSaved(false); }}
             placeholder="sk-..."
-            className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-airport-blue/20 focus:border-airport-blue/40 transition-all font-mono"
+            className="w-full px-3.5 py-2.5 rounded-lg bg-[#fafafa] border border-[#e5e5e5] text-sm text-[#0a0a0a] placeholder:text-[#999] focus:outline-none focus:ring-2 focus:ring-[#0070f3]/20 focus:border-[#0070f3]/40 transition-all font-mono"
           />
 
           <button
             onClick={handleSave}
-            className={`w-full mt-3 py-3 rounded-xl font-semibold text-sm transition-all ${
+            className={`w-full mt-3 py-2.5 rounded-lg font-semibold text-sm transition-all ${
               saved
                 ? 'bg-emerald-500 text-white'
-                : 'bg-airport-blue text-white active:scale-[0.97]'
+                : 'bg-[#171717] text-white active:opacity-90'
             }`}
           >
-            {saved ? '✓ Saved' : 'Save Key'}
+            {saved ? t('saved') : t('saveKey')}
           </button>
 
-          <div className="mt-4 bg-slate-50 rounded-xl p-3.5">
-            <p className="text-xs text-slate-500 leading-relaxed">
-              Your API key is stored locally on this device only. It is never sent anywhere except
-              directly to OpenAI to analyze your photos. You can get a key at{' '}
+          <div className="mt-3 bg-[#fafafa] rounded-lg p-3">
+            <p className="text-xs text-[#666] leading-relaxed">
+              {t('apiKeyHint')}{' '}
+              {t('getKey')}{' '}
               <a
                 href="https://platform.openai.com/api-keys"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-airport-blue underline font-medium"
+                className="text-[#0070f3] underline font-medium"
               >
-                platform.openai.com/api-keys
+                platform.openai.com
               </a>
             </p>
           </div>
         </div>
 
         {/* How it works */}
-        <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 mt-4 anim-fade-in-up anim-delay-1">
-          <h2 className="text-sm font-bold text-slate-800 mb-3">How Detection Works</h2>
+        <div className="bg-white rounded-[10px] p-4 border border-[#e5e5e5] mt-4 anim-fade-in-up anim-delay-2">
+          <h2 className="text-sm font-semibold text-[#0a0a0a] mb-3">{t('howItWorks')}</h2>
           <div className="space-y-3">
             {[
-              ['📷', 'You take a photo of your item'],
-              ['🤖', 'GPT-4o-mini Vision analyzes the image'],
-              ['✅', 'The item is classified into an airport security category'],
-              ['📋', 'Follow-up questions are asked if needed (e.g. battery capacity)'],
-              ['🎯', 'You get a clear verdict: allowed or not allowed'],
-            ].map(([icon, text], i) => (
-              <div key={i} className="flex items-start gap-3">
-                <span className="text-base mt-0.5">{icon}</span>
-                <p className="text-xs text-slate-500 leading-relaxed">{text}</p>
+              { num: '1', text: t('step1Desc') },
+              { num: '2', text: t('step2Desc') },
+              { num: '3', text: t('step3Desc') },
+            ].map((s) => (
+              <div key={s.num} className="flex items-start gap-2.5">
+                <div className="w-[22px] h-[22px] rounded-full bg-[#0070f3] flex items-center justify-center flex-shrink-0">
+                  <span className="text-[11px] font-bold text-white">{s.num}</span>
+                </div>
+                <p className="text-xs text-[#666] leading-relaxed pt-0.5">{s.text}</p>
               </div>
             ))}
           </div>

@@ -22,6 +22,12 @@ export function saveRecord(record: ScanRecord): void {
   localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
 }
 
+export function deleteRecord(id: string): void {
+  const history = loadHistory();
+  const updated = history.filter(r => r.id !== id);
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
+}
+
 export function clearHistory(): void {
   localStorage.removeItem(HISTORY_KEY);
 }

@@ -3,7 +3,7 @@ import type { Screen, ScanSession, ScanRecord, RuleResult } from '../types';
 import type { AiAnalysis } from '../utils/classifier';
 import { getCategoryById } from '../data/categories';
 import { evaluateRules } from '../data/rules';
-import { loadHistory, saveRecord, generateId } from '../utils/storage';
+import { loadHistory, saveRecord, deleteRecord, generateId } from '../utils/storage';
 
 interface AppContextType {
   screen: Screen;
@@ -22,6 +22,7 @@ interface AppContextType {
   refreshHistory: () => void;
   viewHistoryItem: (record: ScanRecord) => void;
   clearSelectedHistory: () => void;
+  deleteHistoryItem: (id: string) => void;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -115,13 +116,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setSelectedHistoryItem(null);
   }, []);
 
+  const deleteHistoryItem = useCallback((id: string) => {
+    deleteRecord(id);
+    setHistory(loadHistory());
+  }, []);
+
   return (
     <AppContext.Provider
       value={{
         screen, session, history, selectedHistoryItem,
         goTo, setPhoto, selectCategory, setAnswers, setAiAnalysis,
         applyAiVerdict, computeResult, saveCurrentScan, resetSession,
-        refreshHistory, viewHistoryItem, clearSelectedHistory,
+        refreshHistory, viewHistoryItem, clearSelectedHistory, deleteHistoryItem,
       }}
     >
       {children}

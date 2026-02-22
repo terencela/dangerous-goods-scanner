@@ -1,11 +1,12 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
+import { useI18n } from '../context/I18nContext';
 import { getCategoryById } from '../data/categories';
 import { getQuestionsForCategory } from '../data/questions';
-import ProgressBar from '../components/ProgressBar';
 
 export default function WizardScreen() {
   const { goTo, session, setAnswers, computeResult } = useApp();
+  const { t } = useI18n();
   const [step, setStep] = useState(0);
   const [local, setLocal] = useState<Record<string, string | number | boolean>>(() => ({
     ...session.answers,
@@ -48,43 +49,49 @@ export default function WizardScreen() {
 
   if (!category || !q) {
     return (
-      <div className="min-h-full flex items-center justify-center bg-airport-light">
-        <p className="text-slate-400 text-sm">No questions for this category.</p>
+      <div className="min-h-full flex items-center justify-center bg-[#fafafa]">
+        <p className="text-[#999] text-sm">{t('noQuestions')}</p>
       </div>
     );
   }
 
-  return (
-    <div className="min-h-full flex flex-col bg-airport-light">
-      {/* Header */}
-      <header className="bg-white shadow-sm px-5 pt-14 pb-5">
-        <div className="max-w-lg mx-auto">
-          <div className="flex items-center justify-between mb-4">
-            <button onClick={back} className="text-sm text-slate-400 font-medium">
-              ← Back
-            </button>
-            <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-full">
-              <span className="text-base">{category.icon}</span>
-              <span className="text-xs font-semibold text-slate-600 max-w-[160px] truncate">{category.name}</span>
-            </div>
-          </div>
-          <ProgressBar current={step} total={qs.length} />
-        </div>
-      </header>
+  const progress = ((step + 1) / qs.length) * 100;
 
-      {/* Body */}
-      <main className="flex-1 px-5 py-8 max-w-lg mx-auto w-full anim-fade-in" key={step}>
-        {session.photoUrl && (
-          <div className="flex justify-center mb-6">
-            <img
-              src={session.photoUrl}
-              alt="Item"
-              className="w-16 h-16 rounded-2xl object-cover border border-slate-200 shadow-sm"
+  return (
+    <div className="min-h-full flex flex-col bg-[#fafafa]">
+      {/* Header */}
+      <div className="bg-white border-b border-[#e5e5e5] px-5 pt-14 pb-4">
+        <div className="max-w-lg mx-auto">
+          <div className="flex items-center justify-between mb-3">
+            <button onClick={back} className="text-sm text-[#999] font-medium flex items-center gap-1">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+              </svg>
+              {t('back')}
+            </button>
+            <span className="text-xs font-medium text-[#999]">{step + 1} / {qs.length}</span>
+          </div>
+          {/* Progress bar */}
+          <div className="h-[2px] bg-[#e5e5e5] rounded-full overflow-hidden">
+            <div
+              className="h-full bg-[#171717] rounded-full transition-all duration-300"
+              style={{ width: `${progress}%` }}
             />
           </div>
-        )}
+        </div>
+      </div>
 
-        <h2 className="text-xl font-bold text-slate-800 text-center mb-8 leading-snug">
+      {/* Body */}
+      <main className="flex-1 px-5 py-6 max-w-lg mx-auto w-full anim-fade-in" key={step}>
+        {/* Contextual hint */}
+        <div className="flex items-start gap-1.5 bg-[#ebf5ff] rounded-lg p-2.5 mb-5">
+          <svg className="w-3 h-3 text-[#0070f3] flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <p className="text-xs text-[#666] leading-[17px]">{t('questionHint')}</p>
+        </div>
+
+        <h2 className="text-xl font-semibold text-[#0a0a0a] text-center mb-7 leading-7 tracking-[-0.3px]">
           {q.text}
         </h2>
 
@@ -100,25 +107,22 @@ export default function WizardScreen() {
                 onChange={(e) => handleNum(q.id, e.target.value)}
                 placeholder={q.placeholder}
                 autoFocus
-                className="w-full text-center text-3xl font-bold py-5 bg-white rounded-2xl border-2 border-slate-200 focus:border-airport-blue focus:outline-none transition-colors text-slate-800 shadow-sm"
+                className="w-full text-center text-3xl font-bold py-5 bg-white rounded-[10px] border border-[#e5e5e5] focus:border-[#171717] focus:outline-none transition-colors text-[#0a0a0a]"
               />
               {q.unit && (
-                <span className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-400 font-semibold text-sm">
+                <span className="absolute right-5 top-1/2 -translate-y-1/2 text-[#999] font-medium text-sm">
                   {q.unit}
                 </span>
               )}
             </div>
 
             {wh !== null && q.id === 'battery-voltage' && (
-              <div className="mt-5 bg-white rounded-2xl p-4 border border-slate-200 text-center anim-fade-in-up anim-delay-1">
-                <p className="text-xs text-slate-400 uppercase tracking-widest mb-1">Energy</p>
+              <div className="mt-5 bg-white rounded-[10px] p-4 border border-[#e5e5e5] text-center anim-fade-in-up anim-delay-1">
+                <p className="text-xs text-[#999] uppercase tracking-widest mb-1">{t('energy')}</p>
                 <p className={`text-3xl font-extrabold ${
                   wh > 160 ? 'text-red-600' : wh > 100 ? 'text-amber-500' : 'text-emerald-600'
                 }`}>
                   {wh.toFixed(1)} Wh
-                </p>
-                <p className="text-[11px] text-slate-400 mt-1.5">
-                  {Number(local['battery-mah'])} mAh × {Number(local['battery-voltage'])} V ÷ 1000
                 </p>
               </div>
             )}
@@ -127,35 +131,32 @@ export default function WizardScreen() {
 
         {/* Select options */}
         {q.type === 'select' && q.options && (
-          <div className="space-y-2.5 max-w-sm mx-auto">
+          <div className="space-y-2 max-w-sm mx-auto">
             {q.options.map((opt, i) => {
               const sel = val === opt.value;
               return (
                 <button
                   key={opt.value}
                   onClick={() => handleSel(q.id, opt.value)}
-                  className={`anim-fade-in-up anim-delay-${Math.min(i, 3) + 1} w-full p-4 rounded-2xl border-2 text-left transition-all ${
+                  className={`anim-fade-in-up w-full p-3.5 rounded-[10px] border text-left transition-all flex items-center gap-3 ${
                     sel
-                      ? 'border-airport-blue bg-airport-blue/5 shadow-md'
-                      : 'border-slate-200 bg-white hover:border-slate-300 shadow-sm'
+                      ? 'border-[#171717] bg-[#f5f5f5]'
+                      : 'border-[#e5e5e5] bg-white hover:border-[#ccc]'
                   }`}
+                  style={{ animationDelay: `${(i + 1) * 0.06}s` }}
                 >
-                  <div className="flex items-center gap-3.5">
-                    <div
-                      className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
-                        sel ? 'border-airport-blue bg-airport-blue' : 'border-slate-300'
-                      }`}
-                    >
-                      {sel && (
-                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                      )}
-                    </div>
-                    <span className={`text-sm ${sel ? 'font-semibold text-airport-blue' : 'text-slate-700'}`}>
-                      {opt.label}
-                    </span>
+                  <div className={`w-[18px] h-[18px] rounded-full border-[1.5px] flex items-center justify-center flex-shrink-0 transition-colors ${
+                    sel ? 'border-[#171717] bg-[#171717]' : 'border-[#ccc]'
+                  }`}>
+                    {sel && (
+                      <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
                   </div>
+                  <span className={`text-[13px] ${sel ? 'font-medium text-[#0a0a0a]' : 'text-[#666]'}`}>
+                    {opt.label}
+                  </span>
                 </button>
               );
             })}
@@ -164,18 +165,21 @@ export default function WizardScreen() {
       </main>
 
       {/* Bottom */}
-      <div className="px-5 pb-10 pt-4 bg-airport-light">
+      <div className="px-5 pb-10 pt-3 border-t border-[#e5e5e5] bg-[#fafafa]">
         <div className="max-w-lg mx-auto">
           <button
             onClick={next}
             disabled={!ok}
-            className={`w-full py-4 rounded-2xl font-bold text-base transition-all ${
+            className={`w-full py-3.5 rounded-[10px] font-semibold text-sm transition-all flex items-center justify-center gap-2 ${
               ok
-                ? 'bg-airport-blue text-white shadow-lg shadow-airport-blue/20 active:scale-[0.97]'
-                : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                ? 'bg-[#171717] text-white active:opacity-90'
+                : 'bg-[#f2f2f2] text-[#999] cursor-not-allowed'
             }`}
           >
-            {last ? 'Check Verdict →' : 'Next →'}
+            {last ? t('showResult') : t('next')}
+            <svg className={`w-4 h-4 ${ok ? 'text-white' : 'text-[#999]'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d={last ? 'M5 13l4 4L19 7' : 'M9 5l7 7-7 7'} />
+            </svg>
           </button>
         </div>
       </div>

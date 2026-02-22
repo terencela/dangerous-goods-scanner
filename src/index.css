@@ -56,6 +56,10 @@ input[type="number"] {
   0%, 100% { transform: translateY(0); }
   50%      { transform: translateY(-6px); }
 }
+@keyframes pulse-frame {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50%      { transform: scale(1.05); opacity: 0.8; }
+}
 
 .anim-fade-in-up {
   animation: fadeInUp 0.4s ease-out both;
@@ -77,3 +81,7 @@ input[type="number"] {
 .anim-delay-2 { animation-delay: 0.16s; }
 .anim-delay-3 { animation-delay: 0.24s; }
 .anim-delay-4 { animation-delay: 0.32s; }
+
+.anim-pulse-frame {
+  animation: pulse-frame 1.6s ease-in-out infinite;
+}
