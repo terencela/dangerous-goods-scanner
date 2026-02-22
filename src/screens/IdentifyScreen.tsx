@@ -3,7 +3,8 @@ import { useApp } from '../context/AppContext';
 import { useI18n } from '../context/I18nContext';
 import { itemCategories, categoryGroups, getCategoryById } from '../data/categories';
 import { getQuestionsForCategory } from '../data/questions';
-import { classifyWithVision, type AiAnalysis } from '../utils/classifier';
+import { classifyWithVision, type AiExtraction } from '../utils/classifier';
+import { canSkipWizardWithExtraction } from '../utils/extractionToAnswers';
 import { getApiKey, hasApiKey } from '../utils/storage';
 
 type Phase = 'analyzing' | 'detected' | 'error' | 'manual';
@@ -30,12 +31,12 @@ function ProgressStep({ label, active, done }: { label: string; active: boolean;
 }
 
 export default function IdentifyScreen() {
-  const { goTo, session, selectCategory, computeResult, applyAiVerdict } = useApp();
+  const { goTo, session, selectCategory, applyExtraction, computeResult, setAiAnalysis } = useApp();
   const { t } = useI18n();
   const [phase, setPhase] = useState<Phase>(() =>
     session.photoUrl && hasApiKey() ? 'analyzing' : 'manual'
   );
-  const [analysis, setAnalysis] = useState<AiAnalysis | null>(null);
+  const [analysis, setAnalysis] = useState<AiExtraction | null>(null);
   const [search, setSearch] = useState('');
   const [progressIdx, setProgressIdx] = useState(0);
 
@@ -50,6 +51,7 @@ export default function IdentifyScreen() {
     }, 2200);
 
     try {
+      // Step 1: AI extracts facts only — never a verdict
       const result = await classifyWithVision(session.photoUrl, key);
       clearInterval(timer);
       setProgressIdx(3);
@@ -57,7 +59,7 @@ export default function IdentifyScreen() {
 
       if (result.error) {
         setPhase('error');
-      } else if (result.identified && result.categoryId && result.categoryId !== 'unknown') {
+      } else if (result.identified && result.categoryId) {
         setPhase('detected');
       } else {
         setPhase('manual');
@@ -101,13 +103,29 @@ export default function IdentifyScreen() {
     }
   };
 
+  /**
+   * SAFE ACCEPT PATH:
+   * - If AI detected with sufficient data → applyExtraction (deterministic rules engine decides verdict)
+   * - If AI detected but data is missing → route to wizard
+   * - AI NEVER decides the verdict
+   */
   const handleAcceptAi = () => {
-    if (!analysis) return;
-    if (analysis.verdict) {
-      applyAiVerdict(analysis);
+    if (!analysis || !analysis.categoryId) return;
+    const catId = analysis.categoryId;
+
+    // Store AI extraction in session for display purposes
+    setAiAnalysis(analysis);
+    selectCategory(catId);
+
+    if (canSkipWizardWithExtraction(catId, analysis)) {
+      // Convert AI extraction to answers + run deterministic rules
+      // applyExtraction does this atomically and returns the result
+      applyExtraction(catId, analysis);
       goTo('result');
-    } else if (analysis.categoryId) {
-      handleSelect(analysis.categoryId);
+    } else {
+      // Need wizard to fill in missing critical data (e.g. couldn't read Wh from label)
+      // The wizard will collect answers and evaluateRules will decide
+      goTo('wizard');
     }
   };
 
@@ -117,7 +135,7 @@ export default function IdentifyScreen() {
     setProgressIdx(0);
   };
 
-  /* ---- Analyzing ---- */
+  /* ─── Analyzing ─── */
   if (phase === 'analyzing') {
     const steps = [t('analyzingStep1'), t('analyzingStep2'), t('analyzingStep3')];
 
@@ -169,15 +187,16 @@ export default function IdentifyScreen() {
     );
   }
 
-  /* ---- Detected ---- */
+  /* ─── Detected ─── */
   if (phase === 'detected' && analysis?.identified) {
     const cat = getCategoryById(analysis.categoryId || '');
-    const hasVerdict = !!analysis.verdict;
     const props = analysis.detectedProperties;
     const hasProps = props && (props.mah || props.wh || props.volume_ml || props.blade_length_cm);
     const confColor = analysis.confidence === 'high' ? 'text-emerald-600' : analysis.confidence === 'medium' ? 'text-amber-600' : 'text-[#999]';
     const confDotColor = analysis.confidence === 'high' ? 'bg-emerald-500' : analysis.confidence === 'medium' ? 'bg-amber-500' : 'bg-[#999]';
     const confLabel = analysis.confidence === 'high' ? t('highConfidence') : analysis.confidence === 'medium' ? t('medConfidence') : t('lowConfidence');
+
+    const willSkipWizard = canSkipWizardWithExtraction(analysis.categoryId || '', analysis);
 
     return (
       <div className="min-h-full flex flex-col bg-[#fafafa]">
@@ -192,37 +211,30 @@ export default function IdentifyScreen() {
         </div>
 
         <div className="flex-1 px-5 pt-2 overflow-y-auto pb-6">
+          {/* Item card */}
           <div className="bg-white rounded-[10px] border border-[#e5e5e5] p-4 mb-4 anim-fade-in-up">
             <div className="mb-1">
               <p className="text-base font-semibold text-[#0a0a0a]">{analysis.itemName || cat?.name}</p>
               <div className="flex items-center gap-1.5 mt-1">
                 <span className={`w-1.5 h-1.5 rounded-full ${confDotColor}`} />
                 <span className={`text-[11px] font-medium ${confColor}`}>{confLabel}</span>
+                {analysis.confidence === 'low' && (
+                  <span className="text-[10px] text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded ml-1">
+                    → verify manually
+                  </span>
+                )}
               </div>
             </div>
 
-            {/* Verdict preview */}
-            {hasVerdict && analysis.verdict && (
-              <div className="mt-3">
-                {(['handBaggage', 'checkedBaggage'] as const).map((bag) => {
-                  const v = analysis.verdict![bag];
-                  const statusCfg = v.status === 'allowed'
-                    ? { color: 'text-emerald-700', bg: 'bg-emerald-50', icon: '✓' }
-                    : v.status === 'conditional'
-                    ? { color: 'text-amber-700', bg: 'bg-amber-50', icon: '⚠' }
-                    : { color: 'text-red-700', bg: 'bg-red-50', icon: '✕' };
-                  return (
-                    <div key={bag} className="flex items-center justify-between py-2.5 border-b border-[#e5e5e5] last:border-b-0">
-                      <div className="flex items-center gap-2">
-                        <span className={`text-xs ${statusCfg.color}`}>{statusCfg.icon}</span>
-                        <span className="text-[13px] text-[#0a0a0a]">{bag === 'handBaggage' ? t('handBaggage') : t('checkedBaggage')}</span>
-                      </div>
-                      <span className={`text-xs font-semibold ${statusCfg.color}`}>
-                        {v.status === 'allowed' ? t('allowed') : v.status === 'conditional' ? t('conditional') : t('notAllowed')}
-                      </span>
-                    </div>
-                  );
-                })}
+            {/* Missing data warning */}
+            {analysis.missingCriticalData && (
+              <div className="mt-3 flex items-start gap-2 bg-amber-50 rounded-lg p-2.5">
+                <svg className="w-3.5 h-3.5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+                <p className="text-[11px] text-amber-700 leading-4">
+                  Couldn't read all required data from the label. You'll need to answer one question.
+                </p>
               </div>
             )}
 
@@ -256,6 +268,11 @@ export default function IdentifyScreen() {
                     <p className={`text-2xl font-extrabold ${
                       props!.wh > 160 ? 'text-red-600' : props!.wh > 100 ? 'text-amber-500' : 'text-emerald-600'
                     }`}>{props!.wh} Wh</p>
+                    {props!.mah && props!.voltage && (
+                      <p className="text-[10px] text-[#999] mt-0.5">
+                        {props!.mah.toLocaleString()} mAh × {props!.voltage} V ÷ 1000
+                      </p>
+                    )}
                   </div>
                 )}
                 {props!.volume_ml && (
@@ -274,11 +291,23 @@ export default function IdentifyScreen() {
             </div>
           )}
 
+          {/* Safety note */}
+          <div className="flex items-start gap-1.5 bg-[#f2f2f2] rounded-lg p-2.5 mb-4">
+            <svg className="w-[11px] h-[11px] text-[#999] flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            </svg>
+            <p className="text-[10px] text-[#999] leading-4">
+              {willSkipWizard
+                ? 'Verdict will be computed using official Zurich Airport rules applied to the detected values above.'
+                : 'We need one more answer to determine the exact rule. The rules engine, not AI, decides the verdict.'}
+            </p>
+          </div>
+
           <button
             onClick={handleAcceptAi}
             className="w-full bg-[#171717] text-white font-semibold py-3.5 rounded-[10px] flex items-center justify-center gap-2 anim-fade-in-up anim-delay-2"
           >
-            {hasVerdict ? t('seeVerdict') : t('yesCorrect')}
+            {willSkipWizard ? t('seeVerdict') : t('yesCorrect')}
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
             </svg>
@@ -295,7 +324,7 @@ export default function IdentifyScreen() {
     );
   }
 
-  /* ---- Error ---- */
+  /* ─── Error ─── */
   if (phase === 'error') {
     return (
       <div className="min-h-full flex flex-col bg-[#fafafa]">
@@ -340,7 +369,7 @@ export default function IdentifyScreen() {
     );
   }
 
-  /* ---- Manual ---- */
+  /* ─── Manual ─── */
   return (
     <div className="min-h-full flex flex-col bg-[#fafafa]">
       <div className="bg-white border-b border-[#e5e5e5] px-5 pt-14 pb-4">

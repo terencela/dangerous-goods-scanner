@@ -1,6 +1,8 @@
-import type { AiAnalysis } from '../utils/classifier';
+import type { AiExtraction } from '../utils/classifier';
+/** @deprecated use AiExtraction */
+export type AiAnalysis = AiExtraction;
 
-export type Screen = 'home' | 'camera' | 'identify' | 'wizard' | 'result' | 'settings';
+export type Screen = 'home' | 'camera' | 'identify' | 'wizard' | 'result' | 'settings' | 'chat';
 
 export type Verdict = 'allowed' | 'conditional' | 'not_allowed';
 
@@ -45,7 +47,7 @@ export interface ScanRecord {
   result: RuleResult;
   photoUrl?: string;
   timestamp: number;
-  aiAnalysis?: AiAnalysis;
+  aiAnalysis?: AiExtraction;
 }
 
 export interface ScanSession {
@@ -53,5 +55,5 @@ export interface ScanSession {
   categoryId?: string;
   answers: Record<string, string | number | boolean>;
   result?: RuleResult;
-  aiAnalysis?: AiAnalysis;
+  aiAnalysis?: AiExtraction;
 }

@@ -5,6 +5,7 @@ import IdentifyScreen from './screens/IdentifyScreen';
 import WizardScreen from './screens/WizardScreen';
 import ResultScreen from './screens/ResultScreen';
 import SettingsScreen from './screens/SettingsScreen';
+import ChatScreen from './screens/ChatScreen';
 
 function AppRouter() {
   const { screen } = useApp();
@@ -22,6 +23,8 @@ function AppRouter() {
       return <ResultScreen />;
     case 'settings':
       return <SettingsScreen />;
+    case 'chat':
+      return <ChatScreen />;
     default:
       return <HomeScreen />;
   }

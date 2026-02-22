@@ -14,6 +14,7 @@ export default function CameraScreen() {
   const [preview, setPreview] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
   const [supportsZoom, setSupportsZoom] = useState(false);
+  const startedRef = useRef(false);
 
   const stopCam = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -21,7 +22,10 @@ export default function CameraScreen() {
   }, []);
 
   const startCam = useCallback(async () => {
+    // Prevent duplicate starts
+    if (streamRef.current) return;
     setState('loading');
+    startedRef.current = true;
     try {
       const s = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1440 } },
@@ -31,25 +35,50 @@ export default function CameraScreen() {
         videoRef.current.srcObject = s;
         await videoRef.current.play();
       }
+
+      // Check if track ended unexpectedly (e.g. camera taken by another app)
       const track = s.getVideoTracks()[0];
       if (track) {
+        track.addEventListener('ended', () => {
+          // Track was killed externally — try to restart
+          streamRef.current = null;
+          if (startedRef.current) setState('loading');
+          setTimeout(() => {
+            if (startedRef.current && state !== 'captured') startCam();
+          }, 1500);
+        });
+
         try {
           const caps = track.getCapabilities?.() as any;
-          if (caps?.zoom) {
-            setSupportsZoom(true);
-          }
+          if (caps?.zoom) setSupportsZoom(true);
         } catch {}
       }
+
       setState('active');
     } catch {
       setState('error');
     }
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Start camera on mount
   useEffect(() => {
     startCam();
-    return stopCam;
+    return () => {
+      startedRef.current = false;
+      stopCam();
+    };
   }, [startCam, stopCam]);
+
+  // Lifecycle hardening: resume camera when page becomes visible again
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && state === 'loading' && !streamRef.current && startedRef.current) {
+        startCam();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [state, startCam]);
 
   const handleZoom = useCallback((value: number) => {
     setZoom(value);
@@ -78,6 +107,7 @@ export default function CameraScreen() {
   const retake = () => {
     setPreview(null);
     setZoom(1);
+    streamRef.current = null; // allow startCam to restart
     startCam();
   };
 
@@ -101,7 +131,15 @@ export default function CameraScreen() {
           </svg>
         </button>
         <span className="text-sm font-medium text-white">{t('takePhoto')}</span>
-        <div className="w-9" />
+
+        {/* Camera active indicator */}
+        {state === 'active' && (
+          <div className="flex items-center gap-1.5 bg-black/35 px-2 py-1 rounded-md">
+            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+            <span className="text-[10px] text-white/70 font-medium">LIVE</span>
+          </div>
+        )}
+        {state !== 'active' && <div className="w-9" />}
       </div>
 
       {/* Viewfinder / Preview */}

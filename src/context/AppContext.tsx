@@ -1,8 +1,9 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
 import type { Screen, ScanSession, ScanRecord, RuleResult } from '../types';
-import type { AiAnalysis } from '../utils/classifier';
+import type { AiExtraction } from '../utils/classifier';
 import { getCategoryById } from '../data/categories';
 import { evaluateRules } from '../data/rules';
+import { extractionToAnswers } from '../utils/extractionToAnswers';
 import { loadHistory, saveRecord, deleteRecord, generateId } from '../utils/storage';
 
 interface AppContextType {
@@ -14,8 +15,13 @@ interface AppContextType {
   setPhoto: (url: string) => void;
   selectCategory: (id: string) => void;
   setAnswers: (answers: Record<string, string | number | boolean>) => void;
-  setAiAnalysis: (analysis: AiAnalysis) => void;
-  applyAiVerdict: (analysis: AiAnalysis) => void;
+  setAiAnalysis: (analysis: AiExtraction) => void;
+  /**
+   * applyExtraction: converts AI extraction facts into deterministic rules verdict.
+   * This is the ONLY approved path to set a result from AI data.
+   * The AI never sets the verdict directly.
+   */
+  applyExtraction: (categoryId: string, extraction: AiExtraction) => RuleResult;
   computeResult: () => RuleResult;
   saveCurrentScan: () => void;
   resetSession: () => void;
@@ -49,30 +55,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setSession((prev) => ({ ...prev, answers }));
   }, []);
 
-  const setAiAnalysis = useCallback((analysis: AiAnalysis) => {
+  const setAiAnalysis = useCallback((analysis: AiExtraction) => {
     setSession((prev) => ({ ...prev, aiAnalysis: analysis }));
   }, []);
 
-  const applyAiVerdict = useCallback((analysis: AiAnalysis) => {
-    if (!analysis.verdict || !analysis.categoryId) return;
-    const result: RuleResult = {
-      handBaggage: {
-        verdict: analysis.verdict.handBaggage.status as RuleResult['handBaggage']['verdict'],
-        message: analysis.verdict.handBaggage.text,
-        tip: analysis.verdict.handBaggage.tip,
-      },
-      checkedBaggage: {
-        verdict: analysis.verdict.checkedBaggage.status as RuleResult['checkedBaggage']['verdict'],
-        message: analysis.verdict.checkedBaggage.text,
-        tip: analysis.verdict.checkedBaggage.tip,
-      },
-    };
+  /**
+   * applyExtraction: THE SAFE PATH for AI-driven results.
+   *
+   * 1. Converts AI-extracted properties → wizard answer format
+   * 2. Calls evaluateRules (deterministic) → verdict
+   * 3. Stores everything in session
+   *
+   * The AI NEVER determines the verdict. Only this pipeline does.
+   */
+  const applyExtraction = useCallback((categoryId: string, extraction: AiExtraction): RuleResult => {
+    const answers = extractionToAnswers(categoryId, extraction);
+    const result = evaluateRules(categoryId, answers);
     setSession((prev) => ({
       ...prev,
-      categoryId: analysis.categoryId,
-      aiAnalysis: analysis,
+      categoryId,
+      answers,
+      aiAnalysis: extraction,
       result,
     }));
+    return result;
   }, []);
 
   const computeResult = useCallback((): RuleResult => {
@@ -126,7 +132,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       value={{
         screen, session, history, selectedHistoryItem,
         goTo, setPhoto, selectCategory, setAnswers, setAiAnalysis,
-        applyAiVerdict, computeResult, saveCurrentScan, resetSession,
+        applyExtraction, computeResult, saveCurrentScan, resetSession,
         refreshHistory, viewHistoryItem, clearSelectedHistory, deleteHistoryItem,
       }}
     >

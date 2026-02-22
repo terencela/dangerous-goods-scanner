@@ -51,7 +51,6 @@ export default function ResultScreen() {
   const fromHistory = !!selectedHistoryItem;
   const result = fromHistory ? selectedHistoryItem.result : session.result;
   const catId = fromHistory ? selectedHistoryItem.categoryId : session.categoryId;
-  const photo = fromHistory ? selectedHistoryItem.photoUrl : session.photoUrl;
   const ai = fromHistory ? selectedHistoryItem.aiAnalysis : session.aiAnalysis;
   const cat = getCategoryById(catId || '');
 
